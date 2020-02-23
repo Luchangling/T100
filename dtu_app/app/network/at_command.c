@@ -269,21 +269,29 @@ u8 *find_first_num(u8 *pdata)
     return p;
 }
 
+s32 qi_urc_ntp_recv_cb(u8 *urc_str, u16 len)
+{
+    return 1;
+}
+
 
 static URC_Command_Entry_Struct s_urc[] = {
     {"+QIURC: \"recv\","     ,qi_urc_socket_recv_cb},
     {"+QIURC: \"close\","    ,qi_urc_socket_close_cb},
     {"+QIURC: \"dnsgip\","   ,qi_urc_dns_prase_cb },
     {"+QIURC: \"pdpdeact\"," ,qi_urc_pdp_deact_cb },
-    {"+CGREG:"               ,qi_urc_cgreg_cb},
+    //{"+CGREG:"               ,qi_urc_cgreg_cb},
     {"RDY"                   ,ready_urc_recv_cb},
     {"+QIOPEN:"              ,qi_open_urc_recv_cb},
     {"+QHTTPGET:"            ,qi_http_get_urc_recv_cb},
     {"+QHTTPREADFILE:"       ,qi_http_read_urc_recv_cb},
     {"RING"                  ,qi_comming_ring_cb},
     {"+CMTI"                 ,qi_cmti_comming_cb},
+    {"+QNTP"                 ,qi_urc_ntp_recv_cb},
     {NULL, NULL}
 };
+
+
 
 s32 qi_urc_socket_recv_cb(u8 *urc_str, u16 len)
 {
@@ -553,7 +561,7 @@ s32 at_transver_command(const char * format, ... )
 
     return SUCCESS;
 }
-
+#if 1
 s32 at_socket_data_send(s32 socket_id , u8 *data , u16 len)
 {
     s32 res = AT_RES_ERR;
@@ -564,13 +572,14 @@ s32 at_socket_data_send(s32 socket_id , u8 *data , u16 len)
     
     if(at_transver_command("AT+QISEND=%d,%d\r\n",socket_id,len) == SUCCESS)
     {
-        err = wait_at_resp(600);
+        err = wait_at_resp(1500);
 
         if(err == OS_ERR_NONE)
         {
+           #if 0
            if(strstr((const char *)get_at_resp_addr(),">") == NULL)
            {
-              
+              LOG(INFO,"SEND ERROR");
            }
            else
            {
@@ -589,6 +598,32 @@ s32 at_socket_data_send(s32 socket_id , u8 *data , u16 len)
                    }
                }
            }
+           #else
+           if(strstr((const char *)get_at_resp_addr(),">") == NULL)
+           {
+              LOG(INFO,"SEND ERROR");
+              OSTimeDly(1);
+           }
+
+           if(mod_com_write(data, len) == len)
+           {
+               err = wait_at_resp(600);
+
+               if(err == OS_ERR_NONE)
+               {
+                    if(strstr((const char *)get_at_resp_addr(),"OK") != NULL)
+                    {
+                        cl_log_hex(data,len,"[DATA]clock(%d) socket(%d)->",clock(),socket_id);
+
+                        res = AT_RES_OK;
+                    }
+               }
+           }
+           #endif
+        }
+        else
+        {
+            LOG(INFO,"SEND ERROR");
         }
     }
     
@@ -597,7 +632,45 @@ s32 at_socket_data_send(s32 socket_id , u8 *data , u16 len)
 
     return res;
 }
+#else
+s32 at_socket_data_send(s32 socket_id , u8 *data , u16 len)
+{
+    s32 res = AT_RES_ERR;
+    
+    INT8U err;
+    
+    lock_at_channel();
+    
+    if(at_transver_command("AT+QISEND=%d,%d\r\n",socket_id,len) == SUCCESS)
+    {
+        OSTimeDly(20);
+        
+        //err = wait_at_resp(600);
 
+        if(mod_com_write(data, len) == len)
+        {
+            err = wait_at_resp(600);
+ 
+            if(err == OS_ERR_NONE)
+            {
+                 if(strstr((const char *)get_at_resp_addr(),"OK") != NULL)
+                 {
+                     cl_log_hex(data,len,"[DATA]clock(%d) socket(%d)->",clock(),socket_id);
+ 
+                     res = AT_RES_OK;
+                 }
+            }
+        }
+
+    }
+    
+    release_at_channel();
+
+
+    return res;
+}
+
+#endif
 
 ErrorStatus ril_exe_command(u32 timeout,u8 *need_resp,u8 *para,u16 max_len,const char * format, ... )
 {
@@ -821,6 +894,62 @@ CmdExeResultEnum at_command_resp_prase(u8 *line)
     return res;
 }
 
+bool at_praser_proc(void)
+{
+    u16 j,recv_len = 0;
+
+    u8 sentence[128] = {0};
+
+    fifo_TypeDef *fifo = mod_channel_fifo_addr();
+
+    j = 0;
+
+    while(fifo_peek_one_sentence(fifo,sentence,&recv_len,sizeof(sentence)) == SUCCESS)
+    {
+        fifo_pop_len(fifo,recv_len);
+
+        sentence[recv_len] = 0;
+        
+        if(recv_len != 2)
+        {
+            if(!urc_prase_process((const char*)sentence))
+            {
+                j += sprintf((char*)&s_at.resp[j],"%s",sentence);
+            }
+        }
+        else
+        {
+            fifo_peek(fifo,&sentence[recv_len],1);
+
+            if(sentence[recv_len] == '>')
+            {
+                fifo_pop_len(fifo,1);
+                
+                sentence[++recv_len] = 0;
+
+                j += sprintf((char*)&s_at.resp[j],"%s",sentence);
+            }
+        }
+    }
+
+    if(recv_len > 0 && j > 0)
+    {
+        recv_len  = fifo_GetLen(fifo);
+
+        fifo_peek(fifo,&s_at.resp[j],recv_len);
+
+        fifo_pop_len(fifo,recv_len);
+
+        j += recv_len;
+
+    }
+
+    s_at.resp[j] = 0;
+
+    return j > 0?true:false;
+
+}
+
 
 void at_task(void *pdata)
 {   
@@ -846,6 +975,14 @@ void at_task(void *pdata)
 
             if(resp_len > 0)
             {
+                #if 0
+
+                if(at_praser_proc())
+                {
+                    OSSemPost(g_atresp_sem);
+                }
+                
+                #else
                 if(s_at.cmdId != AT_INVALID)
                 {
                     
@@ -865,11 +1002,10 @@ void at_task(void *pdata)
                         }
                         #else
                         urc_prase_process((const char*)s_at.resp);
-                        #endif
-
-                        //cl_log(INFO,"%s",(u8 *)s_at.resp);
 
                         OSSemPost(g_atresp_sem);
+                        #endif
+
                     }
                     else
                     {
@@ -913,6 +1049,7 @@ void at_task(void *pdata)
 
                         
                 }
+                #endif
             }
         }
         OSTimeDly(1);

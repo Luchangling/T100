@@ -11,6 +11,7 @@
 #include "command.h"
 #include "bms_service.h"
 #include "bms_service_bsp.h"
+#include "device.h"
 #define CMD_MAX_LEN  1024
 
 #define JT_DATA_DEPART_FLAG      0x2000   //分包标志    0010 0000 0000 0000
@@ -806,6 +807,19 @@ static void protocol_jt_pack_additional_mileage(u8 *pdata, u16 *idx, u16 len, u1
     *return_len = 6;
 }
 
+static void protocol_jt_pack_water_level_info(u8 *pdata, u16 *idx, u16 len, u16 *return_len)
+{
+    //u32 dwtmp;
+    
+    pdata[(*idx)++] = 0x41;
+    pdata[(*idx)++] = 0x01;   
+
+    pdata[(*idx)++] = get_water_level_res();
+        
+    *return_len = 3;
+}
+
+
 
 static void protocol_jt_pack_additional_auth_code(u8 *pdata, u16 *idx, u16 len, u16 *return_len)
 {
@@ -1011,6 +1025,8 @@ void protocol_jt_pack_gps_msg(GpsDataModeEnum mode, const GPSData *gps, u8 *pdat
     content_all += content_len;
     protocol_jt_pack_additional_mileage(send, &send_len, len, &content_len);  //6 bytes
     content_all += content_len;
+    protocol_jt_pack_water_level_info(send, &send_len, len, &content_len);
+    content_all += content_len;
     #if 0
 	config_service_get(CFG_PROTOCOL_VER, TYPE_BYTE, &app_ver, sizeof(app_ver));
 	//四川移动 固定增加鉴权码及IMSI
@@ -1037,100 +1053,57 @@ void protocol_jt_pack_gps_msg(GpsDataModeEnum mode, const GPSData *gps, u8 *pdat
 
 static void protocol_jt_pack_additional_lbs(u8 *pdata, u16 *idx, u16 len, u16 *return_len)
 {
-    #if 0
-    u16 orginal_idx = *idx;
-    u16 k,num=0;
-    GM_ERRCODE ret;
-    
-    gm_cell_info_struct lbs;
-    GM_memset(&lbs,0, sizeof(lbs));
-    
-    if((*idx) + 9 > len)
-    {
-        LOG(WARN,"clock(%d) protocol_jt_pack_additional_lbs assert(len(%d)) failed.", util_clock(), len);
-        return;
-    }
+    u8 jval ,index = 0;
 
-    ret = gsm_get_cell_info(&lbs);
-    LOG(DEBUG,"clock(%d) protocol_jt_pack_additional_lbs ret(%d) lbs(%d).", util_clock(), ret, lbs.nbr_cell_num);
-    
-    num = (lbs.nbr_cell_num > 5) ? 5: lbs.nbr_cell_num;
-    pdata[(*idx)++] = 0x53;//基站信息
-    pdata[(*idx)++] = 1+8*(num + 1);//数据长度
-    pdata[(*idx)++] = (num + 1);//基站个数
-    
-    pdata[(*idx)++] = BHIGH_BYTE(lbs.serv_info.mcc); 
-    pdata[(*idx)++] = BLOW_BYTE(lbs.serv_info.mcc);
-    pdata[(*idx)++] = BLOW_BYTE(lbs.serv_info.mnc); 
-    pdata[(*idx)++] = BHIGH_BYTE(lbs.serv_info.lac); 
-    pdata[(*idx)++] = BLOW_BYTE(lbs.serv_info.lac);
-    pdata[(*idx)++] = BHIGH_BYTE(lbs.serv_info.ci);
-    pdata[(*idx)++] = BLOW_BYTE(lbs.serv_info.ci); 
-    pdata[(*idx)++] = lbs.serv_info.rxlev;// 信号强度  
-        
-    GM_memset(&pdata[(*idx)], 0, 40);
-    for (k=0; k<num; k++) 
+    CellInfoStruct *cell = get_lbs_info();
+
+    if(is_lbs_info_valid())
     {
-        pdata[(*idx)++] = BHIGH_BYTE(lbs.nbr_cell_info[k].mcc); 
-        pdata[(*idx)++] = BLOW_BYTE(lbs.nbr_cell_info[k].mcc);
-        pdata[(*idx)++] = BLOW_BYTE(lbs.nbr_cell_info[k].mnc); 
-        pdata[(*idx)++] = BHIGH_BYTE(lbs.nbr_cell_info[k].lac); 
-        pdata[(*idx)++] = BLOW_BYTE(lbs.nbr_cell_info[k].lac);
-        pdata[(*idx)++] = BHIGH_BYTE(lbs.nbr_cell_info[k].ci);
-        pdata[(*idx)++] = BLOW_BYTE(lbs.nbr_cell_info[k].ci); 
-        pdata[(*idx)++] = lbs.nbr_cell_info[k].rxlev;// 信号强度 
+        pdata[(*idx)++] = 0xA9;
+
+        index = *idx;
+        
+        pdata[(*idx)++] = 0x00;   
+
+        jval = sprintf((char *)&pdata[*idx],"%04x;%02x;%04x,%06x,%02d",cell->mcc,cell->mnc,\
+            cell->lac,cell->cellid,abs(cell->rssi));
+
+        pdata[index] = jval;
+
+        *idx += jval;
+
+        *return_len = jval + 2;
     }
-    
-    *return_len = (*idx) - orginal_idx;
-    #endif
 }
 
 
 void protocol_jt_pack_lbs_msg(u8 *pdata, u16 *idx, u16 len)
 {
-    #if 0
+
     u8 *send;
     u16 send_len = 0;
     u16 content_len = 0;
     u16 content_all = 0;
     GPSData gps;
-	u8 app_ver;
+	//u8 app_ver;
 
 	send = pdata;
 	if (send == NULL)
 	{
-        LOG(INFO,"clock(%d) protocol_jt_pack_lbs_msg assert(GM_MemoryAlloc(%d)) failed.", util_clock(), len);
+        LOG(INFO,"clock(%d) protocol_jt_pack_lbs_msg assert(malloc(%d)) failed.", util_clock(), len);
 		return;
 	}
     
-    GM_memset(&gps,0,sizeof(gps));
-    gps_get_last_data(&gps);
-    if(gps.gps_time == 0)
-    {
-        system_state_get_last_gps(&gps);
-    }
+    memset(&gps,0,sizeof(gps));
     
     
     if(gps.gps_time == (time_t)0)
     {
-        gps.lat = agps_service_get_unfix_lat();
-        gps.lng = agps_service_get_unfix_lng();
-
-        if(gps.lat < 0.00001f)
-        {
-            gps.gps_time = 0;
-        }
-		else
-		{
-			//use current time.
-			gps.gps_time = util_get_utc_time();
-		}
+        gps.lat = 0;//agps_service_get_unfix_lat();
+        gps.lng = 0;//agps_service_get_unfix_lng();
     }
-	else
-	{
-	    //use current time.
-	    gps.gps_time = util_get_utc_time();
-	}
+    
+	gps.gps_time = util_get_utc_time();
 
 
     protocol_jt_pack_head(send, &send_len, len, 1, 0);  // 13bytes | 17bytes
@@ -1138,35 +1111,25 @@ void protocol_jt_pack_lbs_msg(u8 *pdata, u16 *idx, u16 len)
     content_all += content_len;
     protocol_jt_pack_device_status(send, &send_len, len, &content_len, &gps);  //4 bytes
     content_all += content_len;
-    protocol_jt_pack_gps_info(GPS_MODE_FIX_TIME, &gps, send, &send_len, len, &content_len);  //20 bytes
+    protocol_jt_pack_gps_info(GPS_MODE_POWER_UP, &gps, send, &send_len, len, &content_len);  //20 bytes
     content_all += content_len;
     protocol_jt_pack_additional_mileage(send, &send_len, len, &content_len);  //6 bytes
     content_all += content_len;
-	config_service_get(CFG_PROTOCOL_VER, TYPE_BYTE, &app_ver, sizeof(app_ver));
-	//四川移动 固定增加鉴权码及IMSI
-    if(app_ver == PROTOCOL_VER_CMCC_JT808)
-	{
-		protocol_jt_pack_additional_auth_code(send, &send_len, len, &content_len); //max 102byte
-		content_all += content_len;
-		protocol_jt_pack_additional_imsi(send, &send_len, len, &content_len); //17byte
-		content_all += content_len;
-	}
-	else
-	{
-		protocol_jt_pack_additional_lbs(send, &send_len, len, &content_len);  //max 51 bytes
-    	content_all += content_len;
-	}
+    protocol_jt_pack_water_level_info(send, &send_len, len, &content_len);
+    content_all += content_len;
+    protocol_jt_pack_additional_lbs(send, &send_len, len, &content_len);
+    content_all += content_len;
     if((send_len + 2) > len)
     {
-        LOG(WARN,"clock(%d) protocol_jt_pack_lbs_msg assert(len(%d)) failed.", util_clock(), len);
-        GM_MemoryFree(send);
+        LOG(WARN,"clock(%d) protocol_jt_pack_gps_msg assert(len(%d)) failed.", util_clock(), len);
+        free(send);
         return;
     }
     protocol_jt_pack_id_len(send, &send_len, JT_CMD_LOCATE, content_all, 0, false);  // 2bytes
     *idx = send_len;
-
+    
     return;
-    #endif
+
 }
 
 void protocol_jt_pack_gps_msg2(u8 *pdata, u16 *idx, u16 len)
@@ -1553,7 +1516,8 @@ static void protocol_jt_parse_set_param(U8* pdata, u16 len)
         }
 
         switch(para_id)
-        {
+        {
+
             case JT_PARAM_HEART_INTERVAL:
                 value_u16 = (u16)get_value_by_length(&pdata[data_start], para_len);
                 if(value_u16 >= GOOME_HEARTBEAT_MIN && value_u16 <= GOOME_HEARTBEAT_MAX)
@@ -1807,8 +1771,12 @@ void protocol_jt_pack_remote_ack(u8 *pdata, u16 *idx, u16 len, u8 *pRet, u16 ret
     
 
     protocol_jt_pack_head(send, &send_len, len, 1, 0);  // 13bytes | 17bytes
-    content_len=retlen + strlen(prefix_string);
+    #if 1
+    content_len=retlen + strlen(prefix_string) + 1;
     content_len=snprintf((char *)&send[send_len], content_len, "%s%s",prefix_string,pRet);
+    #else
+    content_len=snprintf((char *)&send[send_len], content_len + 1, "%s",pRet);
+    #endif
     send_len += content_len;
     if((send_len + 2) > len)
     {

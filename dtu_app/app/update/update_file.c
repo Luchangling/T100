@@ -682,7 +682,7 @@ static void update_msg_parse_response(u8 *pdata, u16 len)
     u8 req_result = 0;
     u16 idx;
     u8 addr[22]; //xxx.xxx.xxx.xxx:xxxxx
-    u32 ip;
+    //u32 ip;
     u16 port;
     
     req_result = (ProtocolUpdateResultEnum)pdata[13];
@@ -715,7 +715,7 @@ static void update_msg_parse_response(u8 *pdata, u16 len)
             idx = 14;
             port = MKWORD(pdata[idx+4] , pdata[idx+5]);
             snprintf((char *)addr, sizeof(addr),"%d.%d.%d.%d:%d\0",pdata[idx],pdata[idx+1],pdata[idx+2],pdata[idx+3],port);
-            ip =MKDWORD(pdata[idx],pdata[idx+1],pdata[idx+2],pdata[idx+3]);
+            //ip =MKDWORD(pdata[idx],pdata[idx+1],pdata[idx+2],pdata[idx+3]);
             idx += 6;
 
             //file information

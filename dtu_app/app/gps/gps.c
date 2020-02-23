@@ -188,7 +188,7 @@ GM_ERRCODE gps_destroy(void)
 	return GM_SUCCESS;
 }
 
-const char *gps_test = "$GPGSV,4,1,15,01,11,180,21,04,47,226,25,07,18,320,37,08,79,286,23*75\r\n$GPGSV,4,2,15,09,40,274,33,11,47,177,22,23,45,236,26,27,54,028,23*79\r\n$GPGSV,4,3,15,31,07,126,20,03,,,,05,,,,10,,,*4F\r\n$GPGSV,4,4,15,39,,,36,40,,,35,41,,,35*73\r\n$GPRMC,082732.00,A,2235.446376,N,11351.035678,E,0.0,246.4,160220,2.3,W,A*23\r\n";
+//const char *gps_test = "$GPGSV,4,1,15,01,11,180,21,04,47,226,25,07,18,320,37,08,79,286,23*75\r\n$GPGSV,4,2,15,09,40,274,33,11,47,177,22,23,45,236,26,27,54,028,23*79\r\n$GPGSV,4,3,15,31,07,126,20,03,,,,05,,,,10,,,*4F\r\n$GPGSV,4,4,15,39,,,36,40,,,35,41,,,35*73\r\n$GPRMC,082732.00,A,2235.446376,N,11351.035678,E,0.0,246.4,160220,2.3,W,A*23\r\n";
 
 GM_ERRCODE gps_timer_proc(void)
 {
@@ -212,13 +212,11 @@ GM_ERRCODE gps_timer_proc(void)
             {
                 memset(temp,0,1500);
 
-                sprintf((char *)temp,"%s",gps_test);
+                //sprintf((char *)temp,"%s",gps_test);
 
-                //ril_exe_command(1000,"OK",temp,1500,"AT+QGPSGNMEA=\"GSV\"\r\n");
+                ril_exe_command(1000,"OK",temp,1500,"AT+QGPSGNMEA=\"GSV\"\r\n");
 
-                //ril_exe_command(1000,"OK",&temp[strlen((const char *)temp)],1500-strlen((const char*)temp),"AT+QGPSGNMEA=\"RMC\"\r\n");
-
-                
+                ril_exe_command(1000,"OK",&temp[strlen((const char *)temp)],1500-strlen((const char*)temp),"AT+QGPSGNMEA=\"RMC\"\r\n");
 
                 pdata = (u8 *)strstr((const char*)temp,"$");
 
@@ -724,7 +722,6 @@ static void on_received_rmc(const NMEASentenceRMC rmc)
 
 	if (s_gps.state != GM_GPS_FIX_3D)
 	{
-        //LOG(INFO,"gps_state %d",s_gps.state);
 		return;
 	}
 

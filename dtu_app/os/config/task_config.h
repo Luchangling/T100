@@ -10,15 +10,12 @@
 #define START_STK_SIZE  				1024/4
 
 
-/*UART task*/
-#define UART_TASK_PRIO       		 	6
-//设置任务堆栈大小
-#define UART_STK_SIZE  				   64
 
-/*MAIN Task*/
-#define MAIN_TASK_PRIO       			4 
+
+/*UART task*/
+#define EXT_DEVICE_TASK_PRIO       		 	6
 //设置任务堆栈大小
-#define MAIN_STK_SIZE  					128
+#define EXT_DEVICE_STK_SIZE  		        512/4
 
 
 /*NET Task*/
@@ -29,8 +26,9 @@
 /*AT TASK*/
 #define AT_TASK_PRIO       			    2 
 //设置任务堆栈大小
-#define AT_STK_SIZE  					1024/4
+#define AT_STK_SIZE  					512/4
 
 
 #endif
+
 

@@ -37,5 +37,8 @@ ErrorStatus fifo_pop_len(fifo_TypeDef * fifo, u32 len);
 
 ErrorStatus fifo_peek_until(fifo_TypeDef* fifo, u8* data, u16* len_p, const u8 until_char);
 
+ErrorStatus fifo_peek_one_sentence(fifo_TypeDef* fifo, u8* data, u16* len_p , u16 max_len);
+
+
 #endif
 

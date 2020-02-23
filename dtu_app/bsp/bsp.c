@@ -126,6 +126,44 @@ void ResetSystem(u8 *string)
     //while(1);
 }
 
+void bsp_water_box_init(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    
+    GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);	//禁用 JTAG
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15; //.2
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;	
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    
+}
+
+
+u8 bsp_read_water_level(void)
+{
+    u8 res = 0;
+    
+    if(GPIO_ReadOutputDataBit(GPIOA,GPIO_Pin_13))
+    {
+        res |= 1;
+    }
+
+    if(GPIO_ReadOutputDataBit(GPIOA,GPIO_Pin_14))
+    {
+        res |= (1<<1);
+    }
+
+    if(GPIO_ReadOutputDataBit(GPIOA,GPIO_Pin_15))
+    {
+        res |= (1<<2);
+    }
+
+    return res;
+}
+
 void bsp_init(void)
 {
     RCC_Configuration();
@@ -149,6 +187,8 @@ void bsp_init(void)
     #if USE_INTERNAL_FLASH == 0
     spi_flash_init();
     #endif
+
+    bsp_water_box_init();
     //uart_init(115200,BMS_COM);
 }
 

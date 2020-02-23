@@ -52,6 +52,8 @@ bool is_bms_connected(void)
         }
         else
         {
+            fifo_pop_len(fifo,sizeof(bms_head));
+            
             return true;
         }
     }
@@ -87,11 +89,17 @@ void bms_serivce_power_control(void)
 
 void bms_service_init(void)
 {
+    U8 error;
+
+    OS_TMR *p = NULL;
+    
     if(s_bms_ctl.fail_count < 5 && clock() - s_bms_ctl.start_time > 1)
     {
         s_bms_ctl.fail_count++;
         cl_log(INFO , "BMS SERVICE  CONNECT .................");
-        bms_com_write((const u8 *)BMS_CONNEECT_CMD, strlen(BMS_CONNEECT_CMD));
+        //bms_com_write((const u8 *)BMS_CONNEECT_CMD, strlen(BMS_CONNEECT_CMD));
+        bms_service_request_packet(BMS_PF_CODE_INFO,true);
+        
         s_bms_ctl.start_time = clock();
     }
     else if(s_bms_ctl.fail_count >= 5)
@@ -122,6 +130,13 @@ void bms_service_init(void)
         trans_bms_service_status(BMS_SERV_CONECT_OK);
 
         bms_serivce_power_control();
+
+        p = OSTmrCreate(3,3,OS_TMR_OPT_PERIODIC,bms_service_read_info_proc,NULL,NULL,&error);
+
+        if(p != NULL && error == OS_ERR_NONE)
+        {
+            OSTmrStart(p,&error);
+        }
     }
 }
 #if 0
@@ -266,8 +281,10 @@ void bms_service_connect_ok_proc(void)
                 else if(s_pa.type == FRAME_CONTROL)
                 {
                    cl_log(INFO,"get bms control resp pf(%x)",s_pa.pf);
-                   bms_service_data_que_delete_one(&s_pa);                     
+                                       
                 }
+
+                bms_service_data_que_delete_one(&s_pa); 
                 
             }
         }
@@ -281,6 +298,20 @@ void bms_service_connect_ok_proc(void)
         
 }
 
+void bms_service_read_info_proc(void *arg,void *arg1)
+{
+    static u8 id = 0;
+
+    LOG(INFO,"clock(%d) read bms packet id(%d)",clock(),id);
+    
+    bms_service_request_packet(id,false);
+
+    id = (id+1)%BMS_PF_READ_MAX;
+
+    bms_service_control_process();
+
+}
+
 void bms_service_timer_proc(void)
 {
     switch(s_bms_ctl.state)        
@@ -290,7 +321,7 @@ void bms_service_timer_proc(void)
             break;
         case BMS_SERV_CONECT_OK:
             bms_service_connect_ok_proc();
-            bms_service_control_process();
+            //bms_service_control_process();
             break;
         case BMS_SERV_CLOSE:
             break;
@@ -320,18 +351,11 @@ void bms_service_data_que_init(void)
 
 void bms_service_control_process(void)
 {
-    static u32 send_time  = 0;
-
     BMSPacketStruct *bms = bms_service_get_one_data();
 
-    if(clock() - send_time >= 3)
+    if(bms)
     {
-        if(bms)
-        {
-            send_time = clock();
-
-            bms_com_write((u8 *)bms , sizeof(BMSPacketStruct));
-        }
+        bms_com_write((u8 *)bms , sizeof(BMSPacketStruct));
     }
 }
 
@@ -614,5 +638,53 @@ BMSPacketStruct *bms_service_get_one_data(void)
     }
 
     return NULL;
+}
+
+void bms_service_request_packet(BMS_Read_PF_Enum id, bool immediately)
+{
+    BMSPacketStruct *bms = NULL;
+
+    u16 calc_crc = 0;
+
+    bms = (BMSPacketStruct *)malloc(sizeof(BMSPacketStruct));
+
+    if(bms)
+    {
+        memcpy(bms->head,bms_head,3);
+
+        bms->type = FRAME_DATA;
+
+        bms->pf   = id;
+
+        bms->da   = 0xFF;
+
+        bms->sa   = 0xFF;
+
+        memset(bms->data,0,8); //所有的控制器开启
+
+        calc_crc = ModBusCRC16(bms->frame,sizeof(bms->frame));
+
+        bms->crc[0] = (calc_crc     )&0xFF; 
+
+        bms->crc[1] = (calc_crc >> 8)&0xFF; 
+
+        memcpy(bms->tail,bms_tail,3);
+
+        if(immediately)
+        {
+            bms_com_write((u8 *)bms, sizeof(BMSPacketStruct));
+
+            free(bms);
+        }
+        else
+        {
+            bms_service_data_que_insert_one(bms);
+        }
+    }
+    else
+    {
+        LOG(FATAL,"BMS control packet malloc error");
+    }
+    
 }
 

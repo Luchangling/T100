@@ -371,7 +371,7 @@ int FS_Write(int FileHandle, void * DataPtr, u32 Length, u32 * Written)
             #endif
             *Written = Length;
 
-            p->write_size = (p->offset + Length - 4);
+            p->write_size = (p->offset + Length - 4) > p->write_size?(p->offset + Length - 4):p->write_size;
 
             return Length;
         }

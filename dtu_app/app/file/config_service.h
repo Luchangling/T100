@@ -12,7 +12,7 @@
 #include "gps.h"
 
 //发布版修改这个数
-#define VERSION_NUMBER  "1.0.16"
+#define VERSION_NUMBER  "1.1.17"
 
 
 #define APN_DEFAULT "CMNET"
@@ -21,7 +21,7 @@
 #define GOOME_IMEI_DEFAULT "866717048888889"
 #define UPDATE_DEVICE_CODE "SYS"
 #define UPDATE_BOOT_CODE "boot"
-#define CONFIG_DEFAULT_MAIN_ADDR       "47.107.185.7:9100"
+#define CONFIG_DEFAULT_MAIN_ADDR       "webbo.yunjiwulian.com:10003"
 #define CONFIG_LOG_SERVER_ADDERSS      "yj03.yunjiwulian.com:10009"
 //#define CONFIG_LOG_SERVER_ADDERSS      "firmwarelog.gpsorg.net:39998"
 

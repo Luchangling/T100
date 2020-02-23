@@ -542,7 +542,7 @@ GM_ERRCODE gm_socket_send(SocketType *socket, u8 *data, u16 len)
     ret = SocketSend(socket->id, (u8 *)data, len);
     if (ret != len)
     {
-        LOG(INFO,"clock(%d) gm_socket_send type(%d)(%d.%d.%d.%d:%d) id(%d) ret(%d)!=len(%d).", 
+        LOG(INFO,"clock(%d) socket_send type(%d)(%d.%d.%d.%d:%d) id(%d) ret(%d)!=len(%d).", 
             util_clock(), socket->type, socket->ip[0], socket->ip[1], socket->ip[2], socket->ip[3], 
             socket->port,socket->id,ret,len);
         

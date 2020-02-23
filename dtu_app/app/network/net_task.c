@@ -110,11 +110,11 @@ s32 SocketSend(s32 sock_id , u8 *data , u16 len)
     s32 res = 0;
 
 
-    cl_log(INFO,"clock(%d) Start Socket send",clock());
+    LOG(INFO,"clock(%d) Start Socket send",clock());
     
     res = at_socket_data_send(sock_id,data,len);
 
-    cl_log(INFO,"clock(%d) Start Socket compliete(res %d)",clock(),res);
+    LOG(INFO,"clock(%d) Start Socket compliete(res %d)",clock(),res);
     //if(ril_exe_command(600,"OK",NULL,0,"AT+QISEND=%d,%d\r\n",sock_id,len) == SUCCESS)
     //{
         
@@ -328,7 +328,7 @@ void net_service_open(void)
 
     delay_ms(500); //500MS
 
-    cl_log(INFO,"system boot up!!!");
+    LOG(INFO,"system boot up!!!");
     //cl_log(INFO,"wait model ready..%d",clock());    
 }
 
@@ -365,7 +365,7 @@ u8 net_get_csq(void)
 
 void net_get_iccid(u8 *iccid)
 {
-    memcpy(iccid,g_nw.iccid,strlen(g_nw.iccid));
+    memcpy(iccid,g_nw.iccid,strlen((char *)g_nw.iccid));
 }
 
 s32 cclk_cmd_parse(const char *rsp , u16 len)
@@ -389,7 +389,7 @@ s32 cclk_cmd_parse(const char *rsp , u16 len)
 
             t_tm.tm_mon  = t_tm.tm_mon - 1;
 
-            cl_log(INFO,"clock(%d) get net work time %d/%d/%d,%d:%d:%d+%d",clock(),t_tm.tm_year + 1900,t_tm.tm_mon+1,t_tm.tm_mday,t_tm.tm_hour,\
+            LOG(INFO,"clock(%d) get net work time %d/%d/%d,%d:%d:%d+%d",clock(),t_tm.tm_year + 1900,t_tm.tm_mon+1,t_tm.tm_mday,t_tm.tm_hour,\
             t_tm.tm_min,t_tm.tm_sec,t_gmt);
 
             sec = mktime(&t_tm);
@@ -399,7 +399,7 @@ s32 cclk_cmd_parse(const char *rsp , u16 len)
                 sec = sec - (t_gmt * 15 * 60);
             }
 
-            cl_log(INFO,"clock(%d) calac utc sec %x",clock(),sec);
+            LOG(INFO,"clock(%d) calac utc sec %x",clock(),sec);
 
             if(sec > 0)
             {
@@ -416,14 +416,25 @@ CellInfoStruct cell;
 
 void net_get_servi_cell_info(u8 *lbs)
 {
-    if(strstr(lbs,"4G") != NULL)
+    //LOG(INFO,"%s",lbs);
+    if(strstr((const char*)lbs,"LTE") != NULL)
     {
-        if(sscanf(lbs,"%*[^:]:%*[^,],%*[^,],%*[^,],%*[^,],%d,%d,%d,%*[^,],%*[^,],%*[^,],%*[^,],%*[^,],%d,%*[^,],%*[^,],%d",\
+        if(sscanf((char *)lbs,"%*[^:]:%*[^,],%*[^,],%*[^,],%*[^,],%d,%d,%x,%*[^,],%*[^,],%*[^,],%*[^,],%*[^,],%x,%*[^,],%*[^,],%d",\
             &cell.mcc,&cell.mnc,&cell.cellid,&cell.lac,&cell.rssi) > 0)
         {
-            
+            LOG(INFO,"clock(%d) LBS info mcc(%d) mnc(%d) %x,%x,%x",clock(),cell.mcc,cell.mnc,cell.lac,cell.cellid,cell.rssi);
         }
     }    
+}
+
+bool is_lbs_info_valid(void)
+{
+    return (bool)((cell.mcc > 0)?true:false);
+}
+
+CellInfoStruct *get_lbs_info(void)
+{
+    return &cell;
 }
 
 
@@ -436,7 +447,7 @@ void net_service_timer_proc(void)
 
     u8 temp[50] = {0};
 
-    u8 cellinfo[1024] = {0};
+    u8 cellinfo[2048] = {0};
 
     u8 *p = NULL;
 
@@ -557,7 +568,7 @@ void net_service_timer_proc(void)
             {
                 sscanf((const char*)temp,"%*[^ ]%s",g_nw.iccid);
 
-                cl_log(INFO,"clock(%d) Icid %s",clock(),g_nw.iccid);
+                LOG(INFO,"clock(%d) Icid %s",clock(),g_nw.iccid);
                 
                 net_trans_status(NW_GET_IMSI);
                 
@@ -580,12 +591,12 @@ void net_service_timer_proc(void)
                 sscanf((const char*)temp,"%[0-9a-Z]",g_nw.imsi);
                 if(strlen((char *)g_nw.imsi) > 0)
                 {
-                    cl_log(INFO,"clock(%d) model info imsi %s",clock(),g_nw.imsi);
+                    LOG(INFO,"clock(%d) model info imsi %s",clock(),g_nw.imsi);
                 }
 
                 gprs_config_apn();
 
-                net_trans_status(NW_AT_PROCESS);
+                net_trans_status(NW_READ_LBS);
             }
 
             if(clock() - g_nw.start_time >= 3)
@@ -595,52 +606,55 @@ void net_service_timer_proc(void)
             }
             break;
         }
-        case NW_AT_PROCESS:
+        case NW_READ_LBS:
         {
-            //at_single_step_exe(AT_CSQ,200,NULL,"");
-            memset(temp,0,sizeof(temp));
-            if(ril_exe_command(600,"OK",temp,sizeof(temp),"AT+CSQ\r\n") == SUCCESS)
-            {
-                sscanf((const char*)temp,"%*[^ ]%d",&value);
-            }
-
-            g_nw.csq = (u8)value;
-
-            cl_log(INFO,"clock(%d) net serv csq %d",clock(),g_nw.csq);
-
-            memset(temp,0,sizeof(temp));
-            
-            if(ril_exe_command(600,"OK",temp,sizeof(temp),"AT+CCLK?\r\n") == SUCCESS)
-            {
-                cclk_cmd_parse((const char *)temp,strlen((const char *)temp));
-            }
-
-            cl_log(INFO,"clock(%d) net serv sysclock %x ",clock(),get_local_utc_sec());
-
             if(ril_exe_command(600,"OK",cellinfo,sizeof(cellinfo),"AT+QENG=\"servingcell\"\r\n") == SUCCESS)
             {
-                cl_log(INFO,"%s",cellinfo);
-            }
+                net_get_servi_cell_info(cellinfo);
 
-            memset(cellinfo,0,sizeof(cellinfo));
-
-            if(ril_exe_command(600,"OK",cellinfo,sizeof(cellinfo),"AT+QENG=\"neighbourcell\"\r\n") == SUCCESS)
+                if(is_lbs_info_valid())
+                {
+                    net_trans_status(NW_AT_PROCESS);
+                }
+            } 
+            
+            break;
+        }
+        case NW_AT_PROCESS:
+        {
+             //at_single_step_exe(AT_CSQ,200,NULL,"");
+             memset(temp,0,sizeof(temp));
+             if(ril_exe_command(600,"OK",temp,sizeof(temp),"AT+CSQ\r\n") == SUCCESS)
+             {
+                 sscanf((const char*)temp,"%*[^ ]%d",&value);
+             }
+ 
+             g_nw.csq = (u8)value;
+ 
+             LOG(INFO,"clock(%d) net serv csq %d",clock(),g_nw.csq);
+ 
+             memset(temp,0,sizeof(temp));
+             
+             if(ril_exe_command(600,"OK",temp,sizeof(temp),"AT+CCLK?\r\n") == SUCCESS)
+             {
+                 cclk_cmd_parse((const char *)temp,strlen((const char *)temp));
+             }
+ 
+            //cl_log(INFO,"clock(%d) net serv sysclock %x ",clock(),get_local_utc_sec());
+            if(ril_exe_command(600,"OK",cellinfo,sizeof(cellinfo),"AT+QENG=\"servingcell\"\r\n") == SUCCESS)
             {
-                cl_log(INFO,"%s",cellinfo);
+                net_get_servi_cell_info(cellinfo);
             }
 
-      
-
-            period = 10000;
+            period = 800;
             
             break;
         }
         case NW_PDP_DEACTIVE:
         {
-            //at_single_step_exe(AT_PDPDEACT,200,NULL,"=%d",DEFAULT_BEARS);
             if(ril_exe_command(10000,"OK",NULL,0,"AT+QIDEACT=%d\r\n",DEFAULT_BEARS) == SUCCESS)
             {
-                cl_log(INFO,"net serv pdp deactive(%d)",clock());
+                LOG(INFO,"net serv pdp deactive(%d)",clock());
                 net_trans_status(NW_INIT); 
             }
             else
@@ -682,8 +696,6 @@ void net_task_q_process(void)
     net_task_q_struct *m_net_q = NULL;
 
     SmsInfoStruct *sms = NULL;
-
-    //gm_soc_notify_ind_struct soc;
 
     m_net_q = OSQAccept(g_net_q, &err);
     
@@ -757,83 +769,19 @@ void net_task_q_process(void)
     }
 }
 
-typedef enum
-{
-   MAN_WORK_INIT,
-   MAN_WORK_FS_READ,
-   MAN_WORK_TIMER_PROC,
-   MAN_WORK_CLOSE
-}MainWorkStatusEnum;
-
-typedef struct
-{
-    MainWorkStatusEnum sta;
-
-    u32 start_time;
-    
-}Man_Work_Control_Struct;
-
-Man_Work_Control_Struct s_man;
-
-void trans_man_work_status(MainWorkStatusEnum state)
-{
-    s_man.sta = state;
-
-    s_man.start_time = clock();
-}
-
-void man_work_init_proc(void)
-{
-    if(is_model_ready())
-    {
-        trans_man_work_status(MAN_WORK_FS_READ);
-    }
-    else
-    {
-       
-    }
-}
-
-void man_work_fs_read_proc(void)
-{
-    
-    trans_man_work_status(MAN_WORK_TIMER_PROC);
-}
-
-void main_task()
-{
-    switch(s_man.sta)
-    {
-        case MAN_WORK_INIT:
-            man_work_init_proc();
-        break;
-
-        case MAN_WORK_FS_READ:
-            
-            trans_man_work_status(MAN_WORK_TIMER_PROC);
-            //man_work_fs_read_proc();
-            break;
-        case MAN_WORK_TIMER_PROC:
-            
-            break;
-    }
-}
-
-
 void model_task(void *pdata)
 {
+    u32 start_time = 0;
+    
     pdata = pdata;
 
     if(g_net_q == NULL)
     g_net_q = OSQCreate((void **)&g_net_msg,MAX_NET_TASK_QUE);
 
     net_service_open();
-
-    //trans_man_work_status(MAN_WORK_INIT);
     
     while(1)
     {
-        main_task();
         
         net_task_q_process();
 
@@ -846,18 +794,14 @@ void model_task(void *pdata)
             gprs_timer_proc();
 
             gps_timer_proc();
-
-            debug_port_command_process();
-
-            //gps_get_process();
-            bms_service_timer_proc();
         }
         else
         {
-            if(clock() - s_man.start_time >= 1)
+            if(clock() - start_time >= 1)
             {
-                s_man.start_time = clock();
-                cl_log(INFO,"Wait Model Ready..%d",clock());
+                start_time = clock();
+                
+                LOG(INFO,"Wait Model Ready..%d",clock());
             } 
         }
         
@@ -865,24 +809,5 @@ void model_task(void *pdata)
     }
 }
 
-void net_task_del(void)
-{
-    #if 0
-    INT8U err;
-    
-    g_atsend_sem = NULL;
-
-    OSSemDel(g_atsend_sem,OS_DEL_NO_PEND,&err);
-
-    if(err == OS_ERR_TASK_WAITING)
-    {
-        OSSemPost(g_atsend_sem);
-
-        OSTimeDly(200);
-    }
-
-    OSSemDel(g_atsend_sem,OS_DEL_ALWAYS,&err);
-    #endif
-}
 
 

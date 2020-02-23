@@ -1105,12 +1105,12 @@ void gps_service_after_login_response(void)
     protocol_send_heartbeat_msg(&s_gps_socket);
     s_gps_socket_extend.heart_locate_send_time = s_gps_socket_extend.heart_send_time = util_clock();
 
+    gps_service_transfer_status(SOCKET_STATUS_WORK);
+
     if(PROTOCOL_JT808 == config_service_get_app_protocol())
     {
-        gps_service_send_one_locate(GPS_MODE_FIX_TIME, false);
+        gps_service_send_one_locate(GPS_MODE_FIX_TIME, true);
     }
-    
-    gps_service_transfer_status(SOCKET_STATUS_WORK);
 
     led_service_net_set(LED_ON);
 	#if 1

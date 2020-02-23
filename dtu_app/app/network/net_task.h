@@ -21,6 +21,7 @@ typedef enum
     NW_PDP_ACTIVE,
     NW_READ_LOCALIP,
     NW_PDP_DECTIVE,
+    NW_READ_LBS,
     NW_AT_PROCESS,
     NW_PDP_DEACTIVE,
     NW_MODEL_RESTART
@@ -205,6 +206,10 @@ extern s32 cclk_cmd_parse(const char *rsp , u16 len);
 extern void net_get_iccid(u8 *iccid);
 
 extern u8 net_get_csq(void);
+
+extern bool is_lbs_info_valid(void);
+
+extern CellInfoStruct *get_lbs_info(void);
 
 #endif
 

@@ -18,6 +18,7 @@ extern void bsp_init(void);
 void ResetSystem(u8 *string);
 void iwdg_feed(void);
 
+u8 bsp_read_water_level(void);
 
 
 #endif

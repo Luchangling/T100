@@ -250,6 +250,8 @@ typedef struct
     u8 MOS_high_temp_protect_delay;
     u8 MOS_high_temp_threshold;
     u8 MOS_high_temp_rcy_threshold;
+    //BMS reserv 0x19未定义
+    u8 reserv14[8];
     //BMS休眠状态上传
     u8 sleep_enble;
     u8 sleep_reming_time;
@@ -426,6 +428,10 @@ void bms_service_cut_power(void);
 void bms_service_restart_power(void);
 
 void bms_service_packet_control_info_insert(u8 index,BmsBatteryInfoSetStruct *set);
+
+void bms_service_read_info_proc(void *arg,void *arg1);
+
+void bms_service_request_packet(BMS_Read_PF_Enum id, bool immediately);
 
 
 #endif

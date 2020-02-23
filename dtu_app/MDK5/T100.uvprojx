@@ -558,6 +558,11 @@
               <FileType>1</FileType>
               <FilePath>..\app\log\json.c</FilePath>
             </File>
+            <File>
+              <FileName>device.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\app\device.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

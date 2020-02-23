@@ -12,6 +12,7 @@
 #include "system_state.h"
 #include "gps_service.h"
 #include "bms_service.h"
+#include "fs_api.h"
 static const char set_success_rsp_en[] = "Exec Success.\r\n";
 static const char set_fail_rsp_en[] = "Exec failure!\r\n";
 
@@ -391,6 +392,7 @@ u16 COMMNADFUNCDEF(timer)
 
 u16 COMMNADFUNCDEF(version)
 {
+
     u8 para_num;
     u16 len = 0;
     para_num = command_scan((char*)p_cmd_content, "s", cmd_name);
@@ -399,6 +401,7 @@ u16 COMMNADFUNCDEF(version)
     {
         len = snprintf((char*)p_rsp, CMD_MAX_LEN, "version:%s", (char*)VERSION_NUMBER);
     }
+    
 
     return len;
 }
@@ -497,7 +500,7 @@ u16 COMMNADFUNCDEF(bmsparam)
     u8 i,num,para_num;
     U16 index[8] ={0};
     U16 val[8] ={0};
-    u8 flg[6] = 0;
+    u8 flg[6] = {0};
     u16 len  = 0;
     BmsBatteryInfoSetStruct *bms = NULL;
     para_num = command_scan((char*)p_cmd_content, "s;iiiiiiiiiiiiiiii", cmd_name,&index[0],&val[0],&index[1],&val[1],&index[2],&val[2],&index[3],&val[3],\
@@ -592,7 +595,7 @@ CommandParseStruct s_command[] = {
     {"NMEALOG",  CMDEXEFUNC(nmealog)},
     {"RELAY",    CMDEXEFUNC(relay)},
     {"BMSPARAM",    CMDEXEFUNC(bmsparam)},
-    {"RESTART",    CMDEXEFUNC(restart)},
+    {"RESET",    CMDEXEFUNC(restart)},
     {NULL,NULL}
 };
 

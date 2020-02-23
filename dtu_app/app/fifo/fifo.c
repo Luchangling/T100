@@ -486,3 +486,70 @@ ErrorStatus fifo_peek_until(fifo_TypeDef* fifo, u8* data, u16* len_p, const u8 u
 }
 
 
+ErrorStatus fifo_peek_one_sentence(fifo_TypeDef* fifo, u8* data, u16* len_p,u16 max_len)
+{
+	u32 read_point = fifo->head;
+    u32 write_point = fifo->tail;
+	s32 data_size = write_point - read_point;
+	u32 index = 0;
+	bool has_until_char = false;
+
+	if (NULL == fifo || NULL == data || NULL == len_p)
+	{
+		return ERROR;
+	}
+	
+    if(data_size < 0)
+    {
+        data_size += fifo->size;
+    }
+
+    index = 0;
+
+    if(data_size >= 2)
+    {
+        data[index++] = fifo->baseAddr[read_point++];
+
+        read_point %= fifo->size;
+
+        do
+        {
+            data[index] = fifo->baseAddr[read_point];
+
+            if(data[index] == '\n' && data[index-1] == '\r')
+            {
+                has_until_char = true;
+
+                index++;
+                
+                break;
+            }
+            else
+            {
+                read_point++;
+                
+                index++;
+
+                read_point %= fifo->size;
+
+                if(index >= max_len)break;
+            }
+
+        }
+        while(index < data_size);
+    }
+
+
+	*len_p = index;
+	//data[index+1] = '\0';
+	if (has_until_char)
+	{
+    	return SUCCESS;
+	}
+	else
+	{
+		return ERROR;
+	}	    
+}
+
+
